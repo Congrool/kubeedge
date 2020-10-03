@@ -21,6 +21,10 @@ const (
 	DefaultStreamCAFile   = "/etc/kubeedge/ca/streamCA.crt"
 	DefaultStreamCertFile = "/etc/kubeedge/certs/stream.crt"
 	DefaultStreamKeyFile  = "/etc/kubeedge/certs/stream.key"
+
+	DefaultMqttCAFile   = "/etc/kubeedge/ca/rootCA.crt"
+	DefaultMqttCertFile = "/etc/kubeedge/certs/server.crt"
+	DefaultMqttKeyFile  = "/etc/kubeedge/certs/server.key"
 )
 
 const (
@@ -117,7 +121,7 @@ const (
 	CSIOperationTypeControllerUnpublishVolume = "controllerunpublishvolume"
 	CSISyncMsgRespTimeout                     = 1 * time.Minute
 
-	CurrentSupportK8sVersion = "v1.17.1"
+	CurrentSupportK8sVersion = "v1.18.6"
 )
 
 const (

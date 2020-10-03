@@ -21,6 +21,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/blang/semver"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -87,13 +88,18 @@ func addJoinOtherFlags(cmd *cobra.Command, joinOptions *types.JoinOptions) {
 	cmd.Flags().StringVar(&joinOptions.InterfaceName, types.InterfaceName, joinOptions.InterfaceName,
 		"KubeEdge Node interface name string, the default value is eth0")
 
+	cmd.Flags().StringVar(&joinOptions.CGroupDriver, types.CGroupDriver, joinOptions.CGroupDriver,
+		"CGroupDriver that uses to manipulate cgroups on the host (cgroupfs or systemd), the default value is cgroupfs")
+
 	cmd.Flags().StringVar(&joinOptions.CertPath, types.CertPath, joinOptions.CertPath,
 		fmt.Sprintf("The certPath used by edgecore, the default value is %s", common.DefaultCertPath))
 
 	cmd.Flags().StringVarP(&joinOptions.CloudCoreIPPort, types.CloudCoreIPPort, "e", joinOptions.CloudCoreIPPort,
 		"IP:Port address of KubeEdge CloudCore")
 
-	cmd.MarkFlagRequired(types.CloudCoreIPPort)
+	if err := cmd.MarkFlagRequired(types.CloudCoreIPPort); err != nil {
+		fmt.Printf("mark flag required failed with error: %v\n", err)
+	}
 
 	cmd.Flags().StringVarP(&joinOptions.RuntimeType, types.RuntimeType, "r", joinOptions.RuntimeType,
 		"Container runtime type")
@@ -132,7 +138,8 @@ func Add2ToolsList(toolList map[string]types.ToolsInstaller, flagData map[string
 		for i := 0; i < util.RetryTimes; i++ {
 			version, err := util.GetLatestVersion()
 			if err != nil {
-				return err
+				fmt.Println("Failed to get the latest KubeEdge release version")
+				continue
 			}
 			if len(version) > 0 {
 				kubeVer = strings.TrimPrefix(version, "v")
@@ -147,7 +154,7 @@ func Add2ToolsList(toolList map[string]types.ToolsInstaller, flagData map[string
 	}
 	toolList["KubeEdge"] = &util.KubeEdgeInstTool{
 		Common: util.Common{
-			ToolVersion: kubeVer,
+			ToolVersion: semver.MustParse(kubeVer),
 		},
 		CloudCoreIP:           joinOptions.CloudCoreIPPort,
 		EdgeNodeName:          joinOptions.EdgeNodeName,
@@ -157,6 +164,7 @@ func Add2ToolsList(toolList map[string]types.ToolsInstaller, flagData map[string
 		RemoteRuntimeEndpoint: joinOptions.RemoteRuntimeEndpoint,
 		Token:                 joinOptions.Token,
 		CertPort:              joinOptions.CertPort,
+		CGroupDriver:          joinOptions.CGroupDriver,
 	}
 
 	toolList["MQTT"] = &util.MQTTInstTool{}

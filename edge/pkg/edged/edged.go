@@ -331,6 +331,13 @@ func (e *edged) Start() {
 	klog.Infof("starting plugin manager")
 	go e.pluginManager.Run(edgedutil.NewSourcesReady(e.isInitPodReady), utilwait.NeverStop)
 
+	// start the CPU manager in the clcm
+	err := e.clcm.StartCPUManager(e.GetActivePods, edgedutil.NewSourcesReady(e.isInitPodReady), e.statusManager, e.runtimeService)
+	if err != nil {
+		klog.Errorf("Failed to start container manager, err: %v", err)
+		return
+	}
+
 	klog.Infof("starting syncPod")
 	e.syncPod()
 }
@@ -527,6 +534,9 @@ func newEdged(enable bool) (*edged, error) {
 	}
 
 	ed.clcm, err = clcm.NewContainerLifecycleManager(DefaultRootDir)
+	if err != nil {
+		return nil, err
+	}
 
 	useLegacyCadvisorStats := cadvisor.UsingLegacyCadvisorStats(edgedconfig.Config.RuntimeType, edgedconfig.Config.RemoteRuntimeEndpoint)
 	if edgedconfig.Config.EnableMetrics {
@@ -586,14 +596,15 @@ func newEdged(enable bool) (*edged, error) {
 	containerManager, err := cm.NewContainerManager(mount.New(""),
 		ed.cadvisor,
 		cm.NodeConfig{
-			CgroupDriver:                 edgedconfig.Config.CGroupDriver,
-			SystemCgroupsName:            edgedconfig.Config.SystemCgroups,
-			KubeletCgroupsName:           edgedconfig.Config.EdgeCoreCgroups,
-			ContainerRuntime:             edgedconfig.Config.RuntimeType,
-			CgroupsPerQOS:                edgedconfig.Config.CgroupsPerQOS,
-			KubeletRootDir:               DefaultRootDir,
-			ExperimentalCPUManagerPolicy: string(cpumanager.PolicyNone),
-			CgroupRoot:                   edgedconfig.Config.CgroupRoot,
+			CgroupDriver:                      edgedconfig.Config.CGroupDriver,
+			SystemCgroupsName:                 edgedconfig.Config.SystemCgroups,
+			KubeletCgroupsName:                edgedconfig.Config.EdgeCoreCgroups,
+			ContainerRuntime:                  edgedconfig.Config.RuntimeType,
+			CgroupsPerQOS:                     edgedconfig.Config.CgroupsPerQOS,
+			KubeletRootDir:                    DefaultRootDir,
+			ExperimentalCPUManagerPolicy:      string(cpumanager.PolicyNone),
+			CgroupRoot:                        edgedconfig.Config.CgroupRoot,
+			ExperimentalTopologyManagerPolicy: "none",
 		},
 		false,
 		edgedconfig.Config.DevicePluginEnabled,
@@ -1198,6 +1209,10 @@ func (e *edged) handlePodListFromMetaManager(content []byte) (err error) {
 			return err
 		}
 		e.addPod(&pod)
+		if err = e.updatePodStatus(&pod); err != nil {
+			klog.Errorf("handlePodListFromMetaManager: update pod %s status error", pod.Name)
+			return err
+		}
 	}
 
 	return nil
